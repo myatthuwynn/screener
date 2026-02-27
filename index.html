@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binance Futures Screener — USDT-M Perpetuals</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0e17; --bg2: #0f1420; --border: rgba(148,163,184,0.08);
+    --text: #e2e8f0; --text2: #94a3b8; --text3: #475569; --text4: #334155;
+    --green: #22c55e; --green-bg: rgba(34,197,94,0.08); --green-glow: rgba(34,197,94,0.25);
+    --red: #ef4444; --red-bg: rgba(239,68,68,0.08);
+    --amber: #f59e0b; --amber-bg: rgba(245,158,11,0.08);
+    --mono: 'JetBrains Mono', monospace; --sans: 'Outfit', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(148,163,184,0.05); }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.15); border-radius: 3px; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* Header */
+  .header { border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(20px); }
+  .header-inner { max-width: 1100px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px var(--green-glow); }
+  .logo h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; color: #f1f5f9; }
+  .logo-badge { font-size: 9px; font-family: var(--mono); font-weight: 700; color: var(--amber); background: var(--amber-bg); border: 1px solid rgba(245,158,11,0.2); padding: 2px 8px; border-radius: 3px; margin-left: 8px; letter-spacing: 0.06em; }
+  .logo-sub { font-size: 12px; color: var(--text3); margin-top: 2px; margin-left: 18px; font-family: var(--mono); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .last-scan { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+  .btn-scan {
+    padding: 8px 22px; border-radius: 6px; border: none; font-family: var(--mono);
+    font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.15s;
+    background: linear-gradient(135deg, #16a34a, #22c55e); color: var(--bg);
+    box-shadow: 0 2px 12px var(--green-glow);
+  }
+  .btn-scan:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--green-glow); }
+  .btn-scan.stopping { background: var(--red-bg); color: var(--red); box-shadow: none; }
+
+  /* Config */
+  .config { max-width: 1100px; margin: 0 auto; padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; border-bottom: 1px solid rgba(148,163,184,0.06); }
+  .config label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; display: block; margin-bottom: 6px; }
+  .config input {
+    width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(148,163,184,0.1);
+    background: rgba(148,163,184,0.04); color: var(--text); font-family: var(--mono); font-size: 13px; outline: none;
+  }
+  .config input:focus { border-color: rgba(34,197,94,0.3); }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Loading */
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 24px; }
+  .spinner { position: relative; width: 64px; height: 64px; }
+  .spinner-ring1 { position: absolute; inset: 0; border: 2px solid rgba(34,197,94,0.15); border-radius: 50%; border-top-color: var(--green); animation: spin 1s linear infinite; }
+  .spinner-ring2 { position: absolute; inset: 8px; border: 2px solid rgba(34,197,94,0.08); border-radius: 50%; border-bottom-color: rgba(34,197,94,0.4); animation: spin 1.5s linear infinite reverse; }
+  .spinner-pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--green); }
+  .loading-text { font-family: var(--mono); font-size: 13px; color: var(--text2); text-align: center; }
+  .progress-track { width: 260px; height: 3px; background: rgba(148,163,184,0.1); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, var(--green), #16a34a); border-radius: 2px; transition: width 0.3s ease; }
+
+  .error { margin: 20px 0; padding: 16px 20px; border-radius: 8px; background: var(--red-bg); border: 1px solid rgba(239,68,68,0.15); color: #fca5a5; font-size: 13px; font-family: var(--mono); }
+
+  /* Filters */
+  .filters { display: flex; align-items: center; justify-content: space-between; padding: 20px 0 12px; flex-wrap: wrap; gap: 12px; }
+  .filter-tabs { display: flex; gap: 8px; }
+  .filter-btn {
+    padding: 5px 14px; border-radius: 4px; border: 1px solid rgba(148,163,184,0.1);
+    background: transparent; color: var(--text3); font-family: var(--mono); font-size: 12px;
+    font-weight: 500; cursor: pointer; transition: all 0.15s;
+  }
+  .filter-btn.active { border-color: rgba(34,197,94,0.3); background: var(--green-bg); color: var(--green); }
+  .sort-hint { font-size: 11px; color: var(--text4); font-family: var(--mono); }
+
+  /* Table — futures columns */
+  .grid-cols { grid-template-columns: 36px 1fr 95px 105px 85px 85px 70px; }
+
+  .table-head {
+    display: grid; padding: 10px 16px; border-bottom: 1px solid rgba(148,163,184,0.1);
+  }
+  .table-head span {
+    font-size: 10px; font-weight: 600; color: var(--text4); text-transform: uppercase;
+    letter-spacing: 0.1em; user-select: none; font-family: var(--mono);
+  }
+  .table-head span.sortable { cursor: pointer; }
+  .table-head span.sorted { color: var(--text2); }
+  .table-head span:nth-child(n+3) { text-align: right; }
+  .table-body { max-height: 540px; overflow-y: auto; }
+
+  .row {
+    display: grid; align-items: center; padding: 13px 16px;
+    border-bottom: 1px solid var(--border); transition: background 0.15s;
+    animation: fadeIn 0.3s ease both;
+  }
+  .row:hover { background: rgba(148,163,184,0.06) !important; }
+  .row-even { background: rgba(148,163,184,0.02); }
+  .row .idx { color: var(--text3); font-size: 12px; font-family: var(--mono); }
+  .row .coin-name { font-family: var(--mono); font-weight: 600; font-size: 14px; color: var(--text); letter-spacing: 0.02em; }
+  .row .coin-type { font-size: 9px; font-family: var(--mono); color: var(--text4); background: rgba(148,163,184,0.06); padding: 1px 5px; border-radius: 2px; margin-left: 6px; }
+  .row .price { font-family: var(--mono); font-size: 13px; color: #cbd5e1; text-align: right; }
+  .row .change { text-align: right; }
+  .row .change-badge {
+    font-family: var(--mono); font-weight: 700; font-size: 13px; padding: 3px 9px; border-radius: 4px; display: inline-block;
+  }
+  .row .change-badge.up { color: var(--green); background: var(--green-bg); }
+  .row .change-badge.down { color: var(--red); background: var(--red-bg); }
+  .row .vol { font-family: var(--mono); font-size: 12px; color: var(--text3); text-align: right; }
+  .row .funding { font-family: var(--mono); font-size: 12px; text-align: right; }
+  .row .funding.pos { color: var(--green); }
+  .row .funding.neg { color: var(--red); }
+  .row .spark { display: flex; justify-content: flex-end; align-items: flex-end; gap: 1px; height: 26px; }
+  .row .spark-bar { width: 3.5px; border-radius: 1px; transition: height 0.3s ease; }
+
+  /* Empty */
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; }
+  .empty-icon { width: 56px; height: 56px; border-radius: 12px; background: var(--green-bg); border: 1px solid rgba(34,197,94,0.12); display: flex; align-items: center; justify-content: center; font-size: 24px; color: var(--green); }
+  .empty p { font-size: 15px; font-weight: 500; color: var(--text2); }
+  .empty .sub { font-size: 12px; color: var(--text4); max-width: 360px; line-height: 1.6; text-align: center; }
+
+  .footer { padding: 24px 0; border-top: 1px solid rgba(148,163,184,0.06); margin-top: 20px; text-align: center; }
+  .footer p { font-size: 11px; color: #1e293b; font-family: var(--mono); line-height: 1.8; }
+
+  @media (max-width: 700px) {
+    .grid-cols { grid-template-columns: 30px 1fr 75px 90px; }
+    .table-head span:nth-child(5), .table-head span:nth-child(6), .table-head span:nth-child(7),
+    .row .vol, .row .funding, .row .spark { display: none; }
+    .config { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-inner">
+    <div>
+      <div class="logo">
+        <div class="logo-dot" id="statusDot"></div>
+        <h1>Binance Futures Screener</h1>
+        <span class="logo-badge">USDT-M PERP</span>
+      </div>
+      <div class="logo-sub" id="configSummary">3d momentum · ≥30% · perpetuals only</div>
+    </div>
+    <div class="header-right">
+      <span class="last-scan" id="lastScan"></span>
+      <button class="btn-scan" id="scanBtn" onclick="toggleScan()">▶ Scan Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- Config -->
+<div class="config">
+  <div>
+    <label>Threshold %</label>
+    <input type="number" id="cfgThreshold" value="30" min="5" max="200" step="5" onchange="updateConfig()">
+  </div>
+  <div>
+    <label>Lookback Days</label>
+    <input type="number" id="cfgDays" value="3" min="1" max="30" step="1" onchange="updateConfig()">
+  </div>
+  <div>
+    <label>Min 24h Vol (USDT)</label>
+    <input type="number" id="cfgVol" value="5000000" min="100000" max="500000000" step="1000000" onchange="updateConfig()">
+  </div>
+</div>
+
+<div class="container">
+  <div id="errorBox" class="error" style="display:none"></div>
+  <div id="loadingBox" style="display:none"></div>
+  <div id="resultsBox" style="display:none"></div>
+  <div id="emptyBox"></div>
+  <div class="footer">
+    <p>Futures screener — not trading signals. Apply your backtested system rules before any entry.<br>
+    Phase 1: Screen → Phase 2: Validate with rules → Phase 3: Execute with consistency.</p>
+  </div>
+</div>
+
+<script>
+// ─── Binance Futures (USDT-M) API base ──────────────────────
+const FAPI = "https://fapi.binance.com/fapi/v1";
+
+let config = { threshold: 30, days: 3, minVol: 5_000_000 };
+let results = [];
+let scanning = false;
+let aborted = false;
+let sortBy = "pct_change";
+let sortDir = "desc";
+let filter = "all";
+
+function updateConfig() {
+  config.threshold = +document.getElementById("cfgThreshold").value;
+  config.days = +document.getElementById("cfgDays").value;
+  config.minVol = +document.getElementById("cfgVol").value;
+  document.getElementById("configSummary").textContent =
+    `${config.days}d momentum · ≥${config.threshold}% · perpetuals only`;
+}
+
+function fmt(n) {
+  if (Math.abs(n) >= 1e9) return (n/1e9).toFixed(1) + "B";
+  if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(1) + "M";
+  if (Math.abs(n) >= 1e3) return (n/1e3).toFixed(1) + "K";
+  return n.toFixed(1);
+}
+function fmtPrice(p) {
+  if (p >= 100) return p.toFixed(2);
+  if (p >= 1) return p.toFixed(3);
+  if (p >= 0.01) return p.toFixed(5);
+  return p.toFixed(8);
+}
+
+// ─── Loading UI ────────────────────────────────────────────
+function showLoading(pct, msg) {
+  const box = document.getElementById("loadingBox");
+  box.style.display = "block";
+  box.innerHTML = `
+    <div class="loading">
+      <div class="spinner">
+        <div class="spinner-ring1"></div>
+        <div class="spinner-ring2"></div>
+        <div class="spinner-pct">${pct}%</div>
+      </div>
+      <div>
+        <div class="loading-text">${msg}</div>
+        <div class="progress-track"><div class="progress-bar" style="width:${pct}%"></div></div>
+      </div>
+    </div>`;
+}
+function hideLoading() { document.getElementById("loadingBox").style.display = "none"; }
+function showError(msg) { const e = document.getElementById("errorBox"); e.style.display = "block"; e.textContent = "⚠ " + msg; }
+function hideError() { document.getElementById("errorBox").style.display = "none"; }
+
+function showEmpty() {
+  document.getElementById("emptyBox").innerHTML = `
+    <div class="empty">
+      <div class="empty-icon">◎</div>
+      <p>Ready to scan</p>
+      <div class="sub">Screens all Binance USDT-M perpetual futures for ${config.days}-day momentum moves ≥${config.threshold}%. Public API — no key needed.</div>
+    </div>`;
+}
+showEmpty();
+
+// ─── Sparkline ─────────────────────────────────────────────
+function sparkline(klines) {
+  if (!klines || klines.length < 2) return "";
+  const closes = klines.map(k => parseFloat(k[4]));
+  const min = Math.min(...closes), max = Math.max(...closes);
+  const range = max - min || 1;
+  const isUp = closes[closes.length-1] >= closes[0];
+  return closes.map((c, i) => {
+    const h = ((c - min) / range) * 22 + 4;
+    const last = i === closes.length - 1;
+    const color = last ? (isUp ? "var(--green)" : "var(--red)") : "rgba(148,163,184,0.25)";
+    return `<div class="spark-bar" style="height:${h}px;background:${color}"></div>`;
+  }).join("");
+}
+
+// ─── Render ────────────────────────────────────────────────
+function render() {
+  const box = document.getElementById("resultsBox");
+  if (results.length === 0) { box.style.display = "none"; showEmpty(); return; }
+  document.getElementById("emptyBox").innerHTML = "";
+  box.style.display = "block";
+
+  let data = results.filter(r => {
+    if (filter === "gainers") return r.pct > 0;
+    if (filter === "losers") return r.pct < 0;
+    return true;
+  });
+
+  const m = sortDir === "desc" ? -1 : 1;
+  data.sort((a, b) => {
+    if (sortBy === "pct_change") return (a.pct - b.pct) * m;
+    if (sortBy === "volume") return (a.vol - b.vol) * m;
+    if (sortBy === "price") return (a.price - b.price) * m;
+    if (sortBy === "funding") return (a.funding - b.funding) * m;
+    return (a.sym > b.sym ? 1 : -1) * m;
+  });
+
+  const gc = results.filter(r => r.pct > 0).length;
+  const lc = results.filter(r => r.pct < 0).length;
+
+  const colH = (label, key, i) => {
+    const sorted = sortBy === key;
+    const cls = `${key ? "sortable" : ""} ${sorted ? "sorted" : ""}`;
+    const arrow = sorted ? (sortDir === "desc" ? " ↓" : " ↑") : "";
+    const click = key ? `onclick="setSort('${key}')"` : "";
+    return `<span class="${cls}" ${click} style="${i>=2?"text-align:right":""}">${label}${arrow}</span>`;
+  };
+
+  let html = `
+    <div class="filters">
+      <div class="filter-tabs">
+        <button class="filter-btn ${filter==="all"?"active":""}" onclick="setFilter('all')">All (${results.length})</button>
+        <button class="filter-btn ${filter==="gainers"?"active":""}" onclick="setFilter('gainers')">▲ ${gc}</button>
+        <button class="filter-btn ${filter==="losers"?"active":""}" onclick="setFilter('losers')">▼ ${lc}</button>
+      </div>
+      <span class="sort-hint">click headers to sort</span>
+    </div>
+    <div class="table-head grid-cols">
+      ${colH("#", null, 0)}
+      ${colH("Pair", "symbol", 1)}
+      ${colH("Price", "price", 2)}
+      ${colH(config.days + "d Chg", "pct_change", 3)}
+      ${colH("24h Vol", "volume", 4)}
+      ${colH("Funding", "funding", 5)}
+      ${colH("Trend", null, 6)}
+    </div>
+    <div class="table-body">`;
+
+  data.forEach((r, i) => {
+    const isUp = r.pct > 0;
+    const base = r.sym.replace("USDT", "");
+    const fundCls = r.funding >= 0 ? "pos" : "neg";
+    const fundStr = (r.funding >= 0 ? "+" : "") + (r.funding * 100).toFixed(4) + "%";
+
+    html += `
+      <div class="row grid-cols ${i%2===0?"":"row-even"}" style="animation-delay:${i*0.025}s">
+        <span class="idx">${i+1}</span>
+        <div>
+          <span class="coin-name">${base}</span><span class="coin-type">PERP</span>
+        </div>
+        <span class="price">$${fmtPrice(r.price)}</span>
+        <div class="change">
+          <span class="change-badge ${isUp?"up":"down"}">${isUp?"+":""}${r.pct.toFixed(1)}%</span>
+        </div>
+        <span class="vol">$${fmt(r.vol)}</span>
+        <span class="funding ${fundCls}">${fundStr}</span>
+        <div class="spark">${sparkline(r.klines)}</div>
+      </div>`;
+  });
+
+  if (data.length === 0) {
+    html += `<div style="padding:40px;text-align:center;color:var(--text4);font-size:13px">No coins match current filter.</div>`;
+  }
+
+  html += `</div>`;
+  box.innerHTML = html;
+}
+
+function setSort(key) {
+  if (sortBy === key) sortDir = sortDir === "desc" ? "asc" : "desc";
+  else { sortBy = key; sortDir = "desc"; }
+  render();
+}
+function setFilter(f) { filter = f; render(); }
+
+// ─── SCAN (Futures API) ────────────────────────────────────
+async function toggleScan() {
+  if (scanning) { aborted = true; return; }
+  scanning = true; aborted = false;
+  results = [];
+  hideError();
+  document.getElementById("emptyBox").innerHTML = "";
+  document.getElementById("resultsBox").style.display = "none";
+
+  const btn = document.getElementById("scanBtn");
+  btn.textContent = "⏹ Stop"; btn.classList.add("stopping");
+  document.getElementById("statusDot").style.animation = "pulse 1s infinite";
+
+  try {
+    // 1. Get all USDT-M perpetual futures symbols
+    showLoading(5, "Fetching futures contracts...");
+    const infoRes = await fetch(`${FAPI}/exchangeInfo`);
+    const info = await infoRes.json();
+    const symbols = info.symbols
+      .filter(s =>
+        s.contractType === "PERPETUAL" &&
+        s.quoteAsset === "USDT" &&
+        s.status === "TRADING"
+      )
+      .map(s => s.symbol);
+
+    // 2. Get 24h tickers
+    showLoading(12, "Loading 24h volume data...");
+    const tickRes = await fetch(`${FAPI}/ticker/24hr`);
+    const ticks = await tickRes.json();
+    const tickMap = {};
+    ticks.forEach(t => tickMap[t.symbol] = t);
+
+    // 3. Get funding rates (latest)
+    showLoading(18, "Loading funding rates...");
+    const fundRes = await fetch(`${FAPI}/premiumIndex`);
+    const fundData = await fundRes.json();
+    const fundMap = {};
+    fundData.forEach(f => fundMap[f.symbol] = parseFloat(f.lastFundingRate || 0));
+
+    // 4. Filter by volume
+    const filtered = symbols.filter(s => {
+      const t = tickMap[s];
+      return t && parseFloat(t.quoteVolume || 0) >= config.minVol;
+    });
+
+    showLoading(22, `Screening ${filtered.length} futures pairs...`);
+
+    // 5. Fetch klines for each
+    const batchSize = 10;
+    for (let i = 0; i < filtered.length; i += batchSize) {
+      if (aborted) break;
+      const batch = filtered.slice(i, i + batchSize);
+
+      const promises = batch.map(async sym => {
+        try {
+          const res = await fetch(`${FAPI}/klines?symbol=${sym}&interval=1d&limit=${config.days + 1}`);
+          const klines = await res.json();
+          if (!klines || klines.length < 2 || klines.code) return;
+          const open = parseFloat(klines[0][1]);
+          const close = parseFloat(klines[klines.length-1][4]);
+          if (open === 0) return;
+          const pct = ((close - open) / open) * 100;
+
+          if (Math.abs(pct) >= config.threshold) {
+            const t = tickMap[sym];
+            results.push({
+              sym,
+              pct,
+              price: parseFloat(t.lastPrice),
+              vol: parseFloat(t.quoteVolume),
+              funding: fundMap[sym] || 0,
+              klines
+            });
+          }
+        } catch {}
+      });
+      await Promise.all(promises);
+
+      const pct = Math.min(96, 22 + Math.round(((i + batchSize) / filtered.length) * 74));
+      showLoading(pct, `Screening ${Math.min(i+batchSize, filtered.length)}/${filtered.length} pairs... (${results.length} found)`);
+      await new Promise(r => setTimeout(r, 80));
+    }
+
+    showLoading(100, "Done!");
+    document.getElementById("lastScan").textContent = new Date().toLocaleTimeString();
+    await new Promise(r => setTimeout(r, 300));
+
+  } catch (err) {
+    const msg = err.message.includes("Failed to fetch")
+      ? "Cannot reach Binance Futures API. Check your connection or try a VPN if Binance is restricted in your region."
+      : err.message;
+    showError(msg);
+  }
+
+  hideLoading();
+  scanning = false;
+  btn.textContent = "▶ Scan Now"; btn.classList.remove("stopping");
+  document.getElementById("statusDot").style.animation = "";
+  render();
+}
+</script>
+</body>
+</html>
